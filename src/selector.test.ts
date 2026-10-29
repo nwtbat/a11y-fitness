@@ -61,4 +61,25 @@ describe("normalizeTarget", () => {
   it("does not throw on an out-of-range hex escape", () => {
     expect(normalizeTarget(["#\\ffffff a"])).toBe("#\\ffffff a");
   });
+  it("removes an Astro scoped-CSS attribute and keeps the tag", () => {
+    expect(normalizeTarget(["a[data-astro-cid-klcuvl6h]"])).toBe("a");
+  });
+  it("writes * for a compound that holds only an Astro attribute", () => {
+    expect(normalizeTarget(["[data-astro-cid-klcuvl6h] > span"])).toBe("* > span");
+  });
+  it("uses the tag when the last compound holds only an Astro attribute", () => {
+    expect(normalizeTarget(["nav > [data-astro-cid-klcuvl6h]"], "a")).toBe("nav > a");
+  });
+  it("removes a Vue scoped-CSS attribute, also with a value and in upper case", () => {
+    expect(normalizeTarget(['div[data-v-7ba5bd90] > button[DATA-V-7BA5BD90=""].go'])).toBe("div > button.go");
+  });
+  it("gives the same result for two Vue hashes", () => {
+    expect(normalizeTarget(["li[data-v-1a2b3c4d]"])).toBe(normalizeTarget(["li[data-v-9f8e7d6c]"]));
+  });
+  it("keeps data-v- attributes that are not a hash", () => {
+    expect(normalizeTarget(["div[data-v-app] > p[data-v-abc]"])).toBe("div[data-v-app] > p[data-v-abc]");
+  });
+  it("keeps data-section-id with digits", () => {
+    expect(normalizeTarget(['section[data-section-id="1234567"] > a'])).toBe('section[data-section-id="1234567"] > a');
+  });
 });

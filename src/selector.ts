@@ -1,6 +1,10 @@
 /** Normalize an axe node target so that a rebuild of the page gives the same text.
  *  A class or ID is generated, and is removed, when it starts with a build prefix
- *  (css-, sc-, jsx-, svelte-, astro-, emotion-) or holds two or more digits. */
+ *  (css-, sc-, jsx-, svelte-, astro-, emotion-) or holds two or more digits.
+ *  An attribute selector is removed when its name is a scoped-CSS hash
+ *  (data-astro-cid-*, or data-v- with six or more hex digits). All other attribute selectors stay. */
+const HASH_ATTR = /^(?:data-astro-cid-.*|data-v-[0-9a-f]{6,})$/i;
+const ATTR_NAME = /^\[\s*(?:[^\s|\]]*\|(?!=))?([^\s~|^$*=\]]+)/;
 const PREFIX = /^(?:css|sc|jsx|svelte|astro|emotion)-/i;
 const TOKEN = /([.#])((?:\\(?:[0-9a-fA-F]{1,6}\s?|.)|[A-Za-z0-9_-])+)/g;
 const COMBINATOR = /(\s*[>+~]\s*|\s+)/;
@@ -19,7 +23,8 @@ function isGenerated(name: string): boolean {
 
 function normalizeOne(selector: string, tag?: string): string {
   const brackets: string[] = [];
-  let text = selector.replace(/\[[^\]]*\]/g, (match) => `\u0000${brackets.push(match) - 1}\u0000`);
+  let text = selector.replace(/\[[^\]]*\]/g, (match) =>
+    HASH_ATTR.test(ATTR_NAME.exec(match)?.[1] ?? "") ? "" : `\u0000${brackets.push(match) - 1}\u0000`);
   // A removed class inside :not() leaves "div:not()": not valid CSS, but the key stays stable.
   text = text.replace(TOKEN, (match, _sigil: string, name: string) => (isGenerated(name) ? "" : match));
   const parts = text.trim().split(COMBINATOR);
