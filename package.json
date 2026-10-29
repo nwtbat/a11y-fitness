@@ -4,6 +4,9 @@
   "description": "Accessibility fitness functions for Playwright: axe scans with a baseline ratchet, keyboard tests, and a report.",
   "type": "module",
   "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/nwtbat/a11y-fitness.git" },
+  "homepage": "https://github.com/nwtbat/a11y-fitness#readme",
+  "bugs": "https://github.com/nwtbat/a11y-fitness/issues",
   "engines": { "node": ">=20" },
   "bin": { "a11y-fitness": "dist/cli.js" },
   "exports": {

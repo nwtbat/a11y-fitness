@@ -145,8 +145,10 @@ Add this step to the CI job, after the Playwright tests:
 
 ```yaml
       - name: The baseline does not grow without a reason
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.base_ref }}
         run: |
-          BASE="${{ github.base_ref || 'main' }}"
           git fetch --depth=1 origin "$BASE"
           if git cat-file -e "origin/$BASE:a11y-baseline.json" 2>/dev/null; then
             git show "origin/$BASE:a11y-baseline.json" > /tmp/a11y-base.json
@@ -155,6 +157,9 @@ Add this step to the CI job, after the Playwright tests:
           fi
           npx a11y-fitness baseline check --against /tmp/a11y-base.json
 ```
+
+The step runs only for pull requests. A push has no target branch, so the step does not run on a
+push.
 
 The step tells two cases apart:
 
