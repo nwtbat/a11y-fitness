@@ -31,7 +31,10 @@ export async function expectTabOrder(page: Page, locators: Locator[]): Promise<v
     await page.keyboard.press("Tab");
     try {
       await expect(locators[i]).toBeFocused({ timeout: 1000 });
-    } catch {
+    } catch (e) {
+      // Playwright puts matcherResult on an assertion error. Its timeout is set only when the wait timed out.
+      const result = (e as { matcherResult?: { name?: string; timeout?: number } }).matcherResult;
+      if (result?.name !== "toBeFocused" || result.timeout === undefined) throw e;
       throw new Error(`Tab stop ${i + 1} of ${locators.length}: ${locators[i]} does not have the focus. `
         + `The focus is on ${await describeFocus(page)}.`);
     }

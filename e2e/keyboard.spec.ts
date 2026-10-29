@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { expect as baseExpect, test } from "@playwright/test";
 import { expectDialogKeyboard, expectFocusVisible, expectNoFocusTrap, expectTabOrder, KEYBOARD_ANNOTATION } from "../src/keyboard.js";
 
-// Short timeout, so that the cases that must fail do not wait for the default 5 seconds.
+// Short timeout for the expects in this file. expect.configure does not reach the expects inside
+// src/keyboard.ts, so the dialog failure cases still wait for the default 5 seconds.
 const expect = baseExpect.configure({ timeout: 1000 });
 
 const hasKeyboardAnnotation = (): boolean => test.info().annotations.some((a) => a.type === KEYBOARD_ANNOTATION);
