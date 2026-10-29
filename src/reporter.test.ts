@@ -36,6 +36,7 @@ describe("A11yReporter", () => {
     reporter.onTestEnd(testCase("t2", "b"), result(["home"]));
     const end = await reporter.onEnd();
     expect(end).toEqual({ status: "failed" });
+    expect(readJson(outputDir).runStatus).toBe("failed");
     expect(readFileSync(join(outputDir, "report.md"), "utf8")).toContain('The scan name "home" \\[desktop\\] is used more than one time.');
   });
   it("records the keyboard checks of a test", async () => {
@@ -97,7 +98,34 @@ describe("A11yReporter", () => {
     const { outputDir, reporter } = newReporter();
     reporter.onBegin({ shard: null, grep: /home/, grepInvert: null } as any);
     await reporter.onEnd({ status: "passed" } as any);
-    expect(readJson(outputDir).problems).toEqual(["The run used --grep or --grep-invert. This report does not include all tests."]);
+    expect(readJson(outputDir).problems).toEqual(["This report is for a filtered run only (grep in the config)."]);
+  });
+  it("records a filtered run from the command line", async () => {
+    const argv = process.argv;
+    try {
+      process.argv = ["node", "playwright", "test", "--reporter", "list", "-g", "home", "--project=desktop",
+        "--grep-invert", "slow", "--last-failed", "--only-changed", "--workers", "2", "e2e/scan.spec.ts:12"];
+      const { outputDir, reporter } = newReporter();
+      reporter.onBegin(config());
+      await reporter.onEnd({ status: "passed" } as any);
+      expect(readJson(outputDir).problems).toEqual([
+        "This report is for a filtered run only (--grep, --project, --grep-invert, --last-failed, --only-changed, file filter).",
+      ]);
+    } finally {
+      process.argv = argv;
+    }
+  });
+  it("records no filter for a full run from the command line", async () => {
+    const argv = process.argv;
+    try {
+      process.argv = ["node", "playwright", "test", "--reporter", "list", "--workers", "2", "--shard", "1/2", "-u", "all"];
+      const { outputDir, reporter } = newReporter();
+      reporter.onBegin(config());
+      await reporter.onEnd({ status: "passed" } as any);
+      expect(readJson(outputDir).problems).toEqual([]);
+    } finally {
+      process.argv = argv;
+    }
   });
   it("gives null for the run status and the shard when Playwright does not give them", async () => {
     const { outputDir, reporter } = newReporter();

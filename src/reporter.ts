@@ -11,12 +11,46 @@ interface Attempt { scans: ScanRecord[]; keyboard: KeyboardResult | null; proble
 const isDefaultGrep = (grep: FullConfig["grep"] | undefined) =>
   grep === undefined || (Array.isArray(grep) ? grep : [grep]).every((r) => r.source === ".*" || r.source === "(?:)");
 
+// Options that take a value. The value is not a file filter.
+const VALUE_OPTIONS = new Set(["-c", "--config", "--reporter", "-j", "--workers", "--shard", "--project", "-g", "--grep",
+  "--grep-invert", "--retries", "--repeat-each", "--timeout", "--global-timeout", "--max-failures", "--output",
+  "--trace", "--browser", "--tsconfig", "--update-source-method"]);
+// Options with an optional value.
+const OPTIONAL_VALUES: Record<string, Set<string>> = {
+  "-u": new Set(["all", "changed", "missing", "none"]),
+  "--update-snapshots": new Set(["all", "changed", "missing", "none"]),
+};
+const FILTERS: Record<string, string> = {
+  "-g": "--grep", "--grep": "--grep", "--grep-invert": "--grep-invert", "--last-failed": "--last-failed",
+  "--only-changed": "--only-changed", "--project": "--project",
+};
+
+/** The filter options of a `playwright test` command line, in the order of the command line. */
+export function argvFilters(argv: string[]): string[] {
+  const start = argv.indexOf("test");
+  if (start < 0) return [];
+  const found: string[] = [];
+  const add = (name: string) => { if (!found.includes(name)) found.push(name); };
+  const args = argv.slice(start + 1);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const name = arg.startsWith("--") ? arg.split("=")[0] : arg;
+    if (!arg.startsWith("-")) { add("file filter"); continue; }
+    if (FILTERS[name]) add(FILTERS[name]);
+    if (arg.includes("=")) continue;
+    if (VALUE_OPTIONS.has(name)) i++;
+    else if (name === "--only-changed" && args[i + 1] && !args[i + 1].startsWith("-")) i++;
+    else if (OPTIONAL_VALUES[name]?.has(args[i + 1] ?? "")) i++;
+  }
+  return found;
+}
+
 export default class A11yReporter implements Reporter {
   private readonly outputDir: string;
   /** One entry for each test, by its title path and project. A retry or a repeat (repeatEach) replaces the earlier one. */
   private readonly attempts = new Map<string, Attempt>();
   private shard: Shard | null = null;
-  private grepProblem: string | null = null;
+  private filterProblem: string | null = null;
 
   constructor(options: { outputDir?: string } = {}) {
     this.outputDir = options.outputDir ?? "a11y-report";
@@ -28,8 +62,10 @@ export default class A11yReporter implements Reporter {
 
   onBegin(config: FullConfig): void {
     this.shard = config.shard ? { current: config.shard.current, total: config.shard.total } : null;
-    if (!isDefaultGrep(config.grep) || (config.grepInvert !== null && config.grepInvert !== undefined))
-      this.grepProblem = "The run used --grep or --grep-invert. This report does not include all tests.";
+    const filters = argvFilters(process.argv);
+    const configGrep = !isDefaultGrep(config.grep) || (config.grepInvert !== null && config.grepInvert !== undefined);
+    if (configGrep && !filters.includes("--grep") && !filters.includes("--grep-invert")) filters.push("grep in the config");
+    if (filters.length) this.filterProblem = `This report is for a filtered run only (${filters.join(", ")}).`;
     for (const name of ["report.md", "report.json"]) rmSync(join(this.outputDir, name), { force: true });
   }
 
@@ -69,8 +105,8 @@ export default class A11yReporter implements Reporter {
       keyboard: attempts.flatMap((a) => (a.keyboard ? [a.keyboard] : [])),
       baseline: readBaseline(baselinePath()),
       duplicates,
-      problems: [...(this.grepProblem ? [this.grepProblem] : []), ...attempts.flatMap((a) => a.problems)],
-      runStatus: result?.status ?? null,
+      problems: [...(this.filterProblem ? [this.filterProblem] : []), ...attempts.flatMap((a) => a.problems)],
+      runStatus: duplicates.length ? "failed" : result?.status ?? null,
       shard: this.shard,
     });
     mkdirSync(this.outputDir, { recursive: true });
