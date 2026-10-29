@@ -90,7 +90,25 @@ test("the fixture passes a clean page", async ({ page, a11y }) => {
 });
 
 test("the fixture fails a page with a new violation", async ({ page, a11y }) => {
-  test.fail();
   await page.setContent(html("clean").replace('<label for="q">Search</label>', ""));
-  await a11y.scan("clean-without-label");
+  const record = await a11y.scan("clean-without-label");
+  expect(record.fresh.map((f) => `${f.rule} ${f.target}`)).toEqual(["label #q"]);
+  const info = test.info();
+  expect(info.errors).toHaveLength(1);
+  const message = info.errors[0].message ?? "";
+  expect(message).toContain('New accessibility violations on "clean-without-label" [chromium]');
+  expect(message).toContain("label (critical) at #q: Form elements must have labels");
+  expect(message).toContain(record.fresh[0].helpUrl);
+  expect(message).toContain('Fix the violations, or run "a11y-fitness baseline accept <rule> --page clean-without-label'
+    + ' --project chromium --target <target> --reason <text>".');
+  // The soft failure is the expected result. Remove it so that the test passes.
+  info.errors.length = 0;
+  info.status = "passed";
+});
+
+test("a scan name used two times in a test is an error", async ({ page, a11y }) => {
+  await page.setContent(html("clean"));
+  await a11y.scan("clean");
+  await expect(a11y.scan("clean")).rejects.toThrow(
+    'The scan name "clean" is used two times in this test. Each scan name must be unique in a project.');
 });
