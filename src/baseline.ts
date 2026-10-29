@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 export interface Finding {
   page: string; project: string; rule: string; target: string;
@@ -29,24 +29,36 @@ export function readBaseline(path: string): Baseline {
   } catch (error) {
     throw bad(`${(error as Error).message}.`);
   }
-  const entries = (data as { entries?: unknown }).entries;
-  if (!Array.isArray(entries)) throw bad('there is no "entries" list.');
-  entries.forEach((e, i) => {
+  if (typeof data !== "object" || data === null || !Array.isArray((data as { entries?: unknown }).entries)) {
+    throw bad('there is no "entries" list.');
+  }
+  const { version, entries } = data as { version?: unknown; entries: unknown[] };
+  if (version !== 1) throw bad('"version" is not 1.');
+  const keys = new Set<string>();
+  entries.forEach((e: any, i) => {
     for (const field of FIELDS) if (typeof e?.[field] !== "string") throw bad(`entry ${i + 1} has no ${field}.`);
     if (!Number.isInteger(e.count) || e.count < 1) throw bad(`entry ${i + 1} has no count.`);
+    const k = keyOf(e);
+    if (keys.has(k)) throw bad(`entry ${i + 1} repeats an earlier entry.`);
+    keys.add(k);
   });
   return { version: 1, entries: entries as BaselineEntry[] };
 }
 
 function sorted(entries: BaselineEntry[]): BaselineEntry[] {
-  return [...entries].sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
+  return entries
+    .map((e) => ({ k: keyOf(e), e }))
+    .sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0))
+    .map(({ e }) => e);
 }
 
 export function writeBaseline(path: string, baseline: Baseline): void {
   const entries = sorted(baseline.entries).map((e) => ({
     page: e.page, project: e.project, rule: e.rule, target: e.target, count: e.count, reason: e.reason,
   }));
-  writeFileSync(path, `${JSON.stringify({ version: 1, entries }, null, 2)}\n`);
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ version: 1, entries }, null, 2)}\n`);
+  renameSync(tmp, path);
 }
 
 function countKeys(findings: Finding[]): Map<string, { key: Key; findings: Finding[] }> {

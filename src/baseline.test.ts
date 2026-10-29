@@ -34,6 +34,40 @@ describe("readBaseline", () => {
   });
 });
 
+describe("readBaseline rejects bad content", () => {
+  const write = (content: unknown) => {
+    const path = join(tmp(), "a11y-baseline.json");
+    writeFileSync(path, typeof content === "string" ? content : JSON.stringify(content));
+    return path;
+  };
+  const good = { page: "a", project: "b", rule: "c", target: "d", count: 1, reason: "" };
+  it.each(["null", "[]"])("names the file when the JSON is %s", (text) => {
+    const path = write(text);
+    expect(() => readBaseline(path)).toThrow(BaselineError);
+    expect(() => readBaseline(path)).toThrow(`${path} is not a valid baseline: `);
+  });
+  it("rejects a version that is not 1", () => {
+    const path = write({ version: 2, entries: [] });
+    expect(() => readBaseline(path)).toThrow(`${path} is not a valid baseline: "version" is not 1.`);
+  });
+  it("rejects an entry that repeats an earlier entry", () => {
+    const path = write({ version: 1, entries: [good, { ...good, count: 2 }] });
+    expect(() => readBaseline(path)).toThrow(`${path} is not a valid baseline: entry 2 repeats an earlier entry.`);
+  });
+  it.each([0, -1, 1.5])("rejects the count %s", (count) => {
+    const path = write({ version: 1, entries: [{ ...good, count }] });
+    expect(() => readBaseline(path)).toThrow(`${path} is not a valid baseline: entry 1 has no count.`);
+  });
+  it("rejects a field with the wrong type", () => {
+    const path = write({ version: 1, entries: [{ ...good, rule: 5 }] });
+    expect(() => readBaseline(path)).toThrow(`${path} is not a valid baseline: entry 1 has no rule.`);
+  });
+  it("rejects an entry that is a string", () => {
+    const path = write({ version: 1, entries: ["x"] });
+    expect(() => readBaseline(path)).toThrow(`${path} is not a valid baseline: entry 1 has no page.`);
+  });
+});
+
 describe("writeBaseline", () => {
   it("sorts the entries and ends the file with a newline", () => {
     const path = join(tmp(), "a11y-baseline.json");
@@ -89,6 +123,11 @@ describe("pruneBaseline", () => {
   });
   it("keeps the entries of a page and project that the run did not scan", () => {
     const kept = entry("label", 1, "checkout", "phone");
+    const b = pruneBaseline(base(kept), [scan("home", "desktop", [])]);
+    expect(b.entries).toEqual([kept]);
+  });
+  it("keeps the entries of a project that the run did not scan, on a page that it scanned", () => {
+    const kept = entry("label", 1, "home", "phone");
     const b = pruneBaseline(base(kept), [scan("home", "desktop", [])]);
     expect(b.entries).toEqual([kept]);
   });
