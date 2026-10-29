@@ -7,6 +7,8 @@
   .hidden-focus:focus { outline: none; }
   .shadow:focus { outline: none; box-shadow: 0 0 0 3px #005fcc; }
   .border-width { border: 2px solid #333; }
+  .transition { transition: box-shadow .2s; }
+  .transition:focus { outline: none; box-shadow: 0 0 0 3px #005fcc; }
   .border-width:focus { outline: none; border-width: 4px; }
 </style>
 </head>
@@ -23,6 +25,8 @@
   <button id="open-bad">Open bad dialog</button>
   <div id="bad" role="dialog" aria-label="Bad" hidden><button>Inside</button></div>
   <button id="shadow" class="shadow">Shadow</button>
+  <button id="transition" class="transition">Transition</button>
+  <div id="hidden-trap"><button id="h1">Hidden trap 1</button><button id="h2">Hidden trap 2</button><button id="h3" style="display:none">Hidden</button></div>
   <button id="border-width" class="border-width">Border width</button>
   <button id="open-no-escape">Open dialog without Escape</button>
   <div id="no-escape" role="dialog" aria-label="No Escape" hidden><button id="no-escape-inside">Inside</button></div>
@@ -35,6 +39,14 @@
       if (e.key !== "Tab") return;
       e.preventDefault();
       const next = document.activeElement.id === "t1" ? "t2" : "t1";
+      document.getElementById(next).focus();
+    });
+    const hiddenTrap = document.getElementById("hidden-trap");
+    // Traps only the forward Tab key. Shift+Tab leaves the region as usual.
+    hiddenTrap.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab" || e.shiftKey) return;
+      e.preventDefault();
+      const next = document.activeElement.id === "h1" ? "h2" : "h1";
       document.getElementById(next).focus();
     });
     const open = document.getElementById("open"), dialog = document.getElementById("dialog");

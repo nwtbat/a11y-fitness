@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
-import { expect, test } from "@playwright/test";
+import { expect as baseExpect, test } from "@playwright/test";
 import { expectDialogKeyboard, expectFocusVisible, expectNoFocusTrap, expectTabOrder, KEYBOARD_ANNOTATION } from "../src/keyboard.js";
+
+// Short timeout, so that the cases that must fail do not wait for the default 5 seconds.
+const expect = baseExpect.configure({ timeout: 1000 });
 
 const hasKeyboardAnnotation = (): boolean => test.info().annotations.some((a) => a.type === KEYBOARD_ANNOTATION);
 
@@ -14,7 +17,8 @@ test("expectTabOrder passes the real order and records an annotation", async ({ 
 });
 
 test("expectTabOrder fails a wrong order", async ({ page }) => {
-  await expect(expectTabOrder(page, [page.locator("#a"), page.locator("#c")])).rejects.toThrow();
+  await expect(expectTabOrder(page, [page.locator("#a"), page.locator("#c")]))
+    .rejects.toThrow('The focus is on <button id="b"> "B".');
 });
 
 test("expectTabOrder needs two locators", async ({ page }) => {
@@ -28,6 +32,13 @@ test("expectFocusVisible passes an outline", async ({ page }) => {
 
 test("expectFocusVisible passes a box shadow without an outline", async ({ page }) => {
   await expectFocusVisible(page.locator("#shadow"));
+});
+
+test("expectFocusVisible passes a box shadow with a CSS transition", async ({ page }) => {
+  // The element has the focus first, so that the blur in the helper starts a transition.
+  await page.locator("#transition").focus();
+  await page.locator("#transition").evaluate((el) => el.getAnimations().forEach((a) => a.finish()));
+  await expectFocusVisible(page.locator("#transition"));
 });
 
 test("expectFocusVisible passes a change of border width only", async ({ page }) => {
@@ -45,6 +56,10 @@ test("expectNoFocusTrap passes a free region", async ({ page }) => {
 
 test("expectNoFocusTrap fails a trap", async ({ page }) => {
   await expect(expectNoFocusTrap(page.locator("#trap"))).rejects.toThrow("does not move the focus out of");
+});
+
+test("expectNoFocusTrap fails a trap whose last focusable item is hidden", async ({ page }) => {
+  await expect(expectNoFocusTrap(page.locator("#hidden-trap"))).rejects.toThrow("does not move the focus out of");
 });
 
 test("expectDialogKeyboard passes a correct dialog", async ({ page }) => {

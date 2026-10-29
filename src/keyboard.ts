@@ -3,14 +3,24 @@ import { KEYBOARD_ANNOTATION } from "./constants.js";
 
 export { KEYBOARD_ANNOTATION };
 
+// Each selector gets the Playwright pseudo-class :visible, so that a hidden element is not a start point.
 const FOCUSABLE = [
   "a[href]", "button:not([disabled])", "input:not([disabled]):not([type=hidden])", "select:not([disabled])",
-  "textarea:not([disabled])", '[tabindex]:not([tabindex="-1"])', '[contenteditable="true"]',
-].join(", ");
+  "textarea:not([disabled])", '[tabindex]:not([tabindex^="-"])', '[contenteditable="true"]',
+].map((selector) => `${selector}:visible`).join(", ");
 
 function note(what: string): void {
   test.info().annotations.push({ type: KEYBOARD_ANNOTATION, description: what });
 }
+
+const describeFocus = (page: Page): Promise<string> =>
+  page.evaluate(() => {
+    const el = document.activeElement;
+    if (!el || el === document.body) return "the page body";
+    const id = el.id ? ` id="${el.id}"` : "";
+    const text = (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 30);
+    return `<${el.tagName.toLowerCase()}${id}> "${text}"`;
+  });
 
 export async function expectTabOrder(page: Page, locators: Locator[]): Promise<void> {
   if (locators.length < 2) throw new Error("expectTabOrder needs two or more locators.");
@@ -19,7 +29,12 @@ export async function expectTabOrder(page: Page, locators: Locator[]): Promise<v
   await expect(locators[0]).toBeFocused();
   for (let i = 1; i < locators.length; i++) {
     await page.keyboard.press("Tab");
-    await expect(locators[i], `Tab stop ${i + 1} of ${locators.length}`).toBeFocused();
+    try {
+      await expect(locators[i]).toBeFocused({ timeout: 1000 });
+    } catch {
+      throw new Error(`Tab stop ${i + 1} of ${locators.length}: ${locators[i]} does not have the focus. `
+        + `The focus is on ${await describeFocus(page)}.`);
+    }
   }
 }
 
@@ -27,6 +42,8 @@ type FocusStyle = Record<"outline" | "boxShadow" | "border" | "backgroundColor" 
 
 const focusStyle = (locator: Locator): Promise<FocusStyle> =>
   locator.evaluate((el) => {
+    // Finish the running CSS transitions, so that the style is the end state and not a step between.
+    el.getAnimations().forEach((a) => { if (a instanceof CSSTransition) a.finish(); });
     const s = getComputedStyle(el);
     const noOutline = s.outlineStyle === "none" || s.outlineWidth === "0px";
     return {
@@ -62,6 +79,7 @@ export async function expectNoFocusTrap(region: Locator): Promise<void> {
   if (count === 0) throw new Error(`${region} has no focusable element.`);
   for (const [key, start] of [["Tab", items.last()], ["Shift+Tab", items.first()]] as const) {
     await start.focus();
+    await expect(start, `${start} did not take the focus.`).toBeFocused();
     let left = false;
     for (let i = 0; i <= count && !left; i++) {
       await page.keyboard.press(key);
@@ -76,7 +94,7 @@ export async function expectDialogKeyboard(opener: Locator, dialog: Locator): Pr
   const page = opener.page();
   await opener.focus();
   await page.keyboard.press("Enter");
-  await expect(dialog).toBeVisible();
+  await expect(dialog, "Enter did not open the dialog.").toBeVisible();
   await expect.poll(() => dialog.evaluate((d) => d.contains(document.activeElement)),
     { message: "The focus did not move into the dialog." }).toBe(true);
   await page.keyboard.press("Escape");
