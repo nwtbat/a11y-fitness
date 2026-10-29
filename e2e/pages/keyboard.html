@@ -5,6 +5,9 @@
 <style>
   .visible:focus-visible { outline: 2px solid #005fcc; }
   .hidden-focus:focus { outline: none; }
+  .shadow:focus { outline: none; box-shadow: 0 0 0 3px #005fcc; }
+  .border-width { border: 2px solid #333; }
+  .border-width:focus { outline: none; border-width: 4px; }
 </style>
 </head>
 <body>
@@ -19,6 +22,12 @@
   </div>
   <button id="open-bad">Open bad dialog</button>
   <div id="bad" role="dialog" aria-label="Bad" hidden><button>Inside</button></div>
+  <button id="shadow" class="shadow">Shadow</button>
+  <button id="border-width" class="border-width">Border width</button>
+  <button id="open-no-escape">Open dialog without Escape</button>
+  <div id="no-escape" role="dialog" aria-label="No Escape" hidden><button id="no-escape-inside">Inside</button></div>
+  <button id="open-no-return">Open dialog without focus return</button>
+  <div id="no-return" role="dialog" aria-label="No return" hidden><button id="no-return-inside">Inside</button></div>
   <button id="after">After</button>
   <script>
     const trap = document.getElementById("trap");
@@ -31,6 +40,17 @@
     const open = document.getElementById("open"), dialog = document.getElementById("dialog");
     open.addEventListener("click", () => { dialog.hidden = false; document.getElementById("close").focus(); });
     dialog.addEventListener("keydown", (e) => { if (e.key === "Escape") { dialog.hidden = true; open.focus(); } });
+    const noEscape = document.getElementById("no-escape");
+    document.getElementById("open-no-escape").addEventListener("click", () => {
+      noEscape.hidden = false; document.getElementById("no-escape-inside").focus();
+    });
+    const noReturn = document.getElementById("no-return");
+    document.getElementById("open-no-return").addEventListener("click", () => {
+      noReturn.hidden = false; document.getElementById("no-return-inside").focus();
+    });
+    noReturn.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { noReturn.hidden = true; document.getElementById("after").focus(); }
+    });
     document.getElementById("open-bad").addEventListener("click", () => { document.getElementById("bad").hidden = false; });
   </script>
 </body>

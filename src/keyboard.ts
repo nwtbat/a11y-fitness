@@ -23,7 +23,7 @@ export async function expectTabOrder(page: Page, locators: Locator[]): Promise<v
   }
 }
 
-type FocusStyle = Record<"outline" | "boxShadow" | "borderColor" | "backgroundColor" | "textDecoration", string>;
+type FocusStyle = Record<"outline" | "boxShadow" | "border" | "backgroundColor" | "textDecoration", string>;
 
 const focusStyle = (locator: Locator): Promise<FocusStyle> =>
   locator.evaluate((el) => {
@@ -31,7 +31,11 @@ const focusStyle = (locator: Locator): Promise<FocusStyle> =>
     const noOutline = s.outlineStyle === "none" || s.outlineWidth === "0px";
     return {
       outline: noOutline ? "none" : `${s.outlineStyle} ${s.outlineWidth} ${s.outlineColor}`,
-      boxShadow: s.boxShadow, borderColor: s.borderColor, backgroundColor: s.backgroundColor,
+      boxShadow: s.boxShadow,
+      // Width, style, and color of all four sides, so that a change of only one of them counts.
+      border: (["Top", "Right", "Bottom", "Left"] as const)
+        .map((side) => `${s[`border${side}Width`]} ${s[`border${side}Style`]} ${s[`border${side}Color`]}`).join(", "),
+      backgroundColor: s.backgroundColor,
       textDecoration: s.textDecorationLine,
     };
   });
