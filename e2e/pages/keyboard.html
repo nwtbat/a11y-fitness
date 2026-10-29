@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><title>Keyboard</title>
+<style>
+  .visible:focus-visible { outline: 2px solid #005fcc; }
+  .hidden-focus:focus { outline: none; }
+</style>
+</head>
+<body>
+  <button id="a" class="visible">A</button>
+  <button id="b" class="visible">B</button>
+  <button id="c" class="hidden-focus">C</button>
+  <div id="free"><button>Free 1</button><button>Free 2</button></div>
+  <div id="trap"><button id="t1">Trap 1</button><button id="t2">Trap 2</button></div>
+  <button id="open" class="visible">Open dialog</button>
+  <div id="dialog" role="dialog" aria-label="Example" hidden>
+    <button id="close">Close</button>
+  </div>
+  <button id="open-bad">Open bad dialog</button>
+  <div id="bad" role="dialog" aria-label="Bad" hidden><button>Inside</button></div>
+  <button id="after">After</button>
+  <script>
+    const trap = document.getElementById("trap");
+    trap.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab") return;
+      e.preventDefault();
+      const next = document.activeElement.id === "t1" ? "t2" : "t1";
+      document.getElementById(next).focus();
+    });
+    const open = document.getElementById("open"), dialog = document.getElementById("dialog");
+    open.addEventListener("click", () => { dialog.hidden = false; document.getElementById("close").focus(); });
+    dialog.addEventListener("keydown", (e) => { if (e.key === "Escape") { dialog.hidden = true; open.focus(); } });
+    document.getElementById("open-bad").addEventListener("click", () => { document.getElementById("bad").hidden = false; });
+  </script>
+</body>
+</html>
