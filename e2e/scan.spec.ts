@@ -108,7 +108,7 @@ test("the fixture fails a page with a new violation", async ({ page, a11y }) => 
 
 test("a scan name used two times in a test is an error", async ({ page, a11y }) => {
   await page.setContent(html("clean"));
-  await a11y.scan("clean");
-  await expect(a11y.scan("clean")).rejects.toThrow(
-    'The scan name "clean" is used two times in this test. Each scan name must be unique in a project.');
+  await a11y.scan("clean-twice");
+  await expect(a11y.scan("clean-twice")).rejects.toThrow(
+    'The scan name "clean-twice" is used two times in this test. Each scan name must be unique in a project.');
 });
