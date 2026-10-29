@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Generated</title></head>
+<body>
+  <main>
+    <h1>Fixture with generated IDs and classes</h1>
+    <section><div><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></div><input type="text"></section>
+    <section><div><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></div><input type="text"></section>
+  </main>
+  <script>
+    // Each load gives new section IDs and classes, like a Shopify theme and a CSS-in-JS build.
+    // The block scope lets a second setContent in the same window run the script again.
+    {
+      const digits = () => String(1e10 + Math.floor(Math.random() * 9e10));
+      const token = () => Math.random().toString(36).slice(2, 8) + Math.floor(Math.random() * 90 + 10);
+      for (const section of document.querySelectorAll("section")) {
+        section.id = `shopify-section-template--${digits()}__main`;
+        section.className = `css-${token()}`;
+        section.querySelector("input").className = `css-${token()}`;
+      }
+    }
+  </script>
+</body>
+</html>

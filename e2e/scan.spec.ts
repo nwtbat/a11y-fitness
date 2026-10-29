@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test as plain } from "@playwright/test";
 import { test } from "../src/test.js";
 import { axeFindings, WCAG_TAGS } from "../src/scan.js";
-import { compare, readBaseline } from "../src/baseline.js";
+import { compare, initBaseline, keyOf, readBaseline, type ScanRecord } from "../src/baseline.js";
 
 const html = (name: string) => readFileSync(new URL(`./pages/${name}.html`, import.meta.url), "utf8");
 
@@ -22,6 +22,36 @@ plain("a changed section ID gives the same findings", async ({ page }) => {
   const { findings } = await axeFindings(page, "violations", "chromium");
   const c = compare(findings, readBaseline("e2e/a11y-baseline.json"), "violations", "chromium");
   expect(c.fresh).toEqual([]);
+});
+
+plain("generated IDs and classes that change on each load give the same keys", async ({ page }) => {
+  const load = async () => {
+    await page.setContent(html("generated"));
+    const ids = await page.locator("section").evaluateAll((els) => els.map((e) => `${e.id} ${e.className}`));
+    const { findings, axeVersion } = await axeFindings(page, "generated", "chromium");
+    const record: ScanRecord = {
+      page: "generated", project: "chromium", findings, fresh: [], known: [], fixed: [], disabled: {}, axeVersion,
+    };
+    return { ids, findings, record };
+  };
+  const first = await load();
+  const second = await load();
+  for (const ids of [first.ids, second.ids]) {
+    expect(ids).toHaveLength(2);
+    for (const id of ids) expect(id).toMatch(/^shopify-section-template--\d{11}__main css-[a-z0-9]+$/);
+  }
+  expect(second.ids.some((id) => first.ids.includes(id))).toBe(false);
+  expect(first.findings.map((f) => `${f.rule} ${f.target}`)).toEqual([
+    "image-alt * > div > img", "image-alt * > div > img", "label input", "label input",
+  ]);
+  expect(second.findings.map((f) => f.target)).toEqual(first.findings.map((f) => f.target));
+  const baseline = initBaseline([first.record]);
+  expect(baseline.entries.map((e) => `${e.rule} ${e.target} ${e.count}`)).toEqual(["image-alt * > div > img 2", "label input 2"]);
+  expect(initBaseline([second.record]).entries.map(keyOf)).toEqual(baseline.entries.map(keyOf));
+  const c = compare(second.findings, baseline, "generated", "chromium");
+  expect(c.fresh).toEqual([]);
+  expect(c.known).toHaveLength(4);
+  expect(c.fixed).toEqual([]);
 });
 
 plain("include limits the scan to a region", async ({ page }) => {
