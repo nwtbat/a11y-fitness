@@ -1,0 +1,35 @@
+{
+  "name": "@nwtbat/a11y-fitness",
+  "version": "0.1.0",
+  "description": "Accessibility fitness functions for Playwright: axe scans with a baseline ratchet, keyboard tests, and a report.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "bin": { "a11y-fitness": "dist/cli.js" },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./test": { "types": "./dist/test.d.ts", "import": "./dist/test.js" },
+    "./reporter": { "types": "./dist/reporter.d.ts", "import": "./dist/reporter.js" }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "prepare": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "test:all": "npm run typecheck && npm test && npm run test:browser"
+  },
+  "peerDependencies": {
+    "@axe-core/playwright": ">=4.10",
+    "@playwright/test": ">=1.48"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^20.14.0",
+    "tsup": "^8.2.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
