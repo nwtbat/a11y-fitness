@@ -88,8 +88,18 @@ After these steps, the tests fail only for new violations.
 
 ## Baseline commands
 
-All commands read and write `a11y-baseline.json` by default. To use a different file, set
-`--baseline <file>` or the environment variable `A11Y_BASELINE`.
+The baseline file is `a11y-baseline.json` by default. The commands use this file as follows:
+
+- `init` only writes the baseline.
+- `check` only reads the baseline.
+- `prune` and `accept` read the baseline and write it.
+
+To use a different baseline file, set `--baseline <file>` or the environment variable
+`A11Y_BASELINE`. The scan fixture also reads `A11Y_BASELINE`. Thus the tests and the commands
+use the same file.
+
+The commands `init`, `prune`, and `check` also read the report. The default report file is
+`a11y-report/report.json`. To use a different report file, set `--report <file>`.
 
 | Command | What it does |
 |---|---|
