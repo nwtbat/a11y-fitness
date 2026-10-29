@@ -118,6 +118,67 @@ describe("a11y-fitness baseline", () => {
     expect(err[0]).toContain("--against");
     expect(err[1]).toBe("Usage: a11y-fitness baseline init|prune|accept|check [options]");
   });
+  it("check passes when the target branch has no baseline", () => {
+    const against = join(dir, "missing.json");
+    writeFileSync(join(dir, "a11y-baseline.json"), JSON.stringify({ version: 1, entries: [
+      { page: "home", project: "desktop", rule: "label", target: "input", count: 1, reason: "" }] }));
+    expect(cli("baseline", "check", "--against", against)).toBe(0);
+    expect(out).toContain(`${against} does not exist. The target branch has no baseline. The check passes.`);
+    expect(err).toEqual([]);
+  });
+  it("check without a target baseline still fails a corrupt current baseline", () => {
+    writeFileSync(join(dir, "a11y-baseline.json"), "{ not json");
+    expect(cli("baseline", "check", "--against", join(dir, "missing.json"))).toBe(1);
+    expect(err.join("\n")).toContain("is not a valid baseline");
+  });
+  it("check without a target baseline still gives the prune hint", () => {
+    writeFileSync(join(dir, "a11y-report/report.json"), JSON.stringify({ scans: [{ page: "home", project: "desktop", findings: [], fresh: [], known: [],
+      fixed: [{ page: "home", project: "desktop", rule: "label", target: "input", count: 2, reason: "" }], disabled: {}, axeVersion: "4.10.0" }] }));
+    expect(cli("baseline", "check", "--against", join(dir, "missing.json"))).toBe(0);
+    expect(out.join("\n")).toContain('2 elements in the baseline are fixed. Run "a11y-fitness baseline prune".');
+  });
+  it("check with an empty target baseline still needs a reason for growth", () => {
+    const against = join(dir, "base.json");
+    writeFileSync(against, JSON.stringify({ version: 1, entries: [] }));
+    writeFileSync(join(dir, "a11y-baseline.json"), JSON.stringify({ version: 1, entries: [
+      { page: "home", project: "desktop", rule: "label", target: "input", count: 1, reason: "" }] }));
+    expect(cli("baseline", "check", "--against", against)).toBe(1);
+    expect(out.join("\n")).not.toContain("The check passes.");
+  });
+  it.each([["invalid JSON", "{ not json"], ["no scans list", "{}"]])("init refuses a report with %s", (_, text) => {
+    const report = join(dir, "a11y-report/report.json");
+    writeFileSync(report, text);
+    expect(cli("baseline", "init")).toBe(1);
+    expect(err.join("\n")).toContain(`${report} is not a valid report: `);
+    expect(existsSync(join(dir, "a11y-baseline.json"))).toBe(false);
+  });
+  it.each([["invalid JSON", "{ not json"], ["no scans list", "{}"]])("prune refuses a report with %s", (_, text) => {
+    writeFileSync(join(dir, "a11y-report/report.json"), text);
+    expect(cli("baseline", "prune")).toBe(1);
+    expect(err.join("\n")).toContain("is not a valid report: ");
+  });
+  it.each([["invalid JSON", "{ not json"], ["no scans list", "{}"]])("check warns about a report with %s and continues", (_, text) => {
+    const report = join(dir, "a11y-report/report.json");
+    writeFileSync(report, text);
+    const against = join(dir, "base.json");
+    writeFileSync(against, JSON.stringify({ version: 1, entries: [] }));
+    expect(cli("baseline", "check", "--against", against)).toBe(0);
+    expect(err).toHaveLength(1);
+    expect(err[0]).toMatch(new RegExp(`^Warning: .*report\\.json is not a valid report: `));
+  });
+  it("uses A11Y_BASELINE as the default baseline path", () => {
+    const saved = process.env.A11Y_BASELINE;
+    const file = join(dir, "from-env.json");
+    process.env.A11Y_BASELINE = file;
+    try {
+      expect(run(["baseline", "init", "--report", join(dir, "a11y-report/report.json")], io)).toBe(0);
+      expect(existsSync(file)).toBe(true);
+      expect(out.join("\n")).toContain(`to ${file}.`);
+    } finally {
+      if (saved === undefined) delete process.env.A11Y_BASELINE;
+      else process.env.A11Y_BASELINE = saved;
+    }
+  });
   it("gives the usage for an unknown command", () => {
     expect(run(["nothing"], io)).toBe(1);
     expect(err.join("\n")).toContain("Usage: a11y-fitness baseline init|prune|accept|check");

@@ -13,7 +13,14 @@ const USAGE = "Usage: a11y-fitness baseline init|prune|accept|check [options]";
 
 function readReport(path: string): { scans: ScanRecord[]; problems: string[] } {
   if (!existsSync(path)) throw new BaselineError(`${path} does not exist. Run the Playwright tests first.`);
-  const report = JSON.parse(readFileSync(path, "utf8")) as Partial<Report> & { scans: ScanRecord[] };
+  const bad = (why: string) => new BaselineError(`${path} is not a valid report: ${why}`);
+  let report: Partial<Report> & { scans: ScanRecord[] };
+  try {
+    report = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    throw bad(`${(error as Error).message}.`);
+  }
+  if (typeof report !== "object" || report === null || !Array.isArray(report.scans)) throw bad('there is no "scans" list.');
   // The same lines as "**Problems:**" in report.md. An older report can lack the fields.
   const problems = problemLines({
     ...(report as Report),
@@ -84,11 +91,25 @@ export function run(argv: string[], io: IO): number {
       }
       case "check": {
         if (!values.against) throw new BaselineError("check needs --against <the baseline file of the target branch>.");
-        const problems = checkGrowth(readBaseline(resolve(values.against)), readBaseline(baselineFile));
-        problems.forEach((p) => io.err(p));
+        const againstFile = resolve(values.against);
+        const current = readBaseline(baselineFile);
+        let problems: string[] = [];
+        if (existsSync(againstFile)) {
+          problems = checkGrowth(readBaseline(againstFile), current);
+          problems.forEach((p) => io.err(p));
+        } else {
+          // The first adoption: the target branch has no baseline yet.
+          io.out(`${againstFile} does not exist. The target branch has no baseline. The check passes.`);
+        }
         if (existsSync(reportFile)) {
-          const fixed = elements(readScans(reportFile).flatMap((s) => s.fixed));
-          if (fixed) io.out(`${fixed} elements in the baseline are fixed. Run "a11y-fitness baseline prune".`);
+          // The report only gives the prune hint here, so a bad report is not an error.
+          try {
+            const fixed = elements(readScans(reportFile).flatMap((s) => s.fixed ?? []));
+            if (fixed) io.out(`${fixed} elements in the baseline are fixed. Run "a11y-fitness baseline prune".`);
+          } catch (error) {
+            if (!(error instanceof BaselineError)) throw error;
+            io.err(`Warning: ${error.message}`);
+          }
         }
         return problems.length ? 1 : 0;
       }
