@@ -5,6 +5,7 @@
  *  (data-astro-cid-*, or data-v- with six or more hex digits). All other attribute selectors stay. */
 const HASH_ATTR = /^(?:data-astro-cid-.*|data-v-[0-9a-f]{6,})$/i;
 const ATTR_NAME = /^\[\s*(?:[^\s|\]]*\|(?!=))?([^\s~|^$*=\]]+)/;
+const REMOVED = "\u0001";
 const PREFIX = /^(?:css|sc|jsx|svelte|astro|emotion)-/i;
 const TOKEN = /([.#])((?:\\(?:[0-9a-fA-F]{1,6}\s?|.)|[A-Za-z0-9_-])+)/g;
 const COMBINATOR = /(\s*[>+~]\s*|\s+)/;
@@ -23,15 +24,18 @@ function isGenerated(name: string): boolean {
 
 function normalizeOne(selector: string, tag?: string): string {
   const brackets: string[] = [];
+  // A removed token becomes REMOVED first, so that a compound next to a space combinator is
+  // not lost when the text is split. The marker is taken out of each compound after the split.
   let text = selector.replace(/\[[^\]]*\]/g, (match) =>
-    HASH_ATTR.test(ATTR_NAME.exec(match)?.[1] ?? "") ? "" : `\u0000${brackets.push(match) - 1}\u0000`);
+    HASH_ATTR.test(ATTR_NAME.exec(match)?.[1] ?? "") ? REMOVED : `\u0000${brackets.push(match) - 1}\u0000`);
   // A removed class inside :not() leaves "div:not()": not valid CSS, but the key stays stable.
-  text = text.replace(TOKEN, (match, _sigil: string, name: string) => (isGenerated(name) ? "" : match));
+  text = text.replace(TOKEN, (match, _sigil: string, name: string) => (isGenerated(name) ? REMOVED : match));
   const parts = text.trim().split(COMBINATOR);
   const out: string[] = [];
   for (let i = 0; i < parts.length; i++) {
     if (i % 2 === 0) {
-      out.push(parts[i] !== "" ? parts[i] : i === parts.length - 1 && tag ? tag : "*");
+      const compound = parts[i].replaceAll(REMOVED, "");
+      out.push(compound !== "" ? compound : i === parts.length - 1 && tag ? tag : "*");
     } else {
       const sep = parts[i].trim();
       out.push(sep === "" ? " " : ` ${sep} `);

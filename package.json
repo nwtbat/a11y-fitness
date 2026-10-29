@@ -19,6 +19,7 @@
     "build": "tsup",
     "prepare": "tsup",
     "typecheck": "tsc --noEmit",
+    "pretest": "tsup",
     "test": "vitest run",
     "pretest:browser": "tsup",
     "test:browser": "playwright test",

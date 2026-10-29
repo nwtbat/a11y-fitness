@@ -82,4 +82,17 @@ describe("normalizeTarget", () => {
   it("keeps data-section-id with digits", () => {
     expect(normalizeTarget(['section[data-section-id="1234567"] > a'])).toBe('section[data-section-id="1234567"] > a');
   });
+  it("keeps a descendant compound when its only attribute is removed and uses the tag", () => {
+    expect(normalizeTarget(["nav [data-astro-cid-x]"], "a")).toBe("nav a");
+  });
+  it("writes * for a first compound that holds only a removed attribute before a space", () => {
+    expect(normalizeTarget(["[data-astro-cid-x] span"])).toBe("* span");
+  });
+  it("keeps a descendant compound when its only class is removed", () => {
+    expect(normalizeTarget(["nav .sc-abc12"])).toBe("nav *");
+    expect(normalizeTarget(["nav .sc-abc12"], "a")).toBe("nav a");
+  });
+  it("leaves an empty :not() when its scoped-CSS attribute is removed", () => {
+    expect(normalizeTarget(["a:not([data-v-1a2b3c4d])"])).toBe("a:not()");
+  });
 });

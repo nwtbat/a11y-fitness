@@ -14,23 +14,27 @@ test("a consumer config can name the reporter by its package name", () => {
   const root = fileURLToPath(new URL("..", import.meta.url));
   // A directory outside this repo, so that node_modules lookup does not reach the repo.
   const dir = mkdtempSync(join(tmpdir(), "a11y-consumer-"));
-  mkdirSync(join(dir, "node_modules", "@nwtbat"), { recursive: true });
-  symlinkSync(root, join(dir, "node_modules", "@nwtbat", "a11y-fitness"), "dir");
-  symlinkSync(join(root, "node_modules", "@playwright"), join(dir, "node_modules", "@playwright"), "dir");
-  writeFileSync(join(dir, "playwright.config.mjs"), `export default {
+  try {
+    mkdirSync(join(dir, "node_modules", "@nwtbat"), { recursive: true });
+    symlinkSync(root, join(dir, "node_modules", "@nwtbat", "a11y-fitness"), "dir");
+    symlinkSync(join(root, "node_modules", "@playwright"), join(dir, "node_modules", "@playwright"), "dir");
+    writeFileSync(join(dir, "playwright.config.mjs"), `export default {
   testDir: ".",
   reporter: [["@nwtbat/a11y-fitness/reporter", { outputDir: "a11y-report" }]],
 };
 `);
-  writeFileSync(join(dir, "empty.spec.mjs"), `import { test } from "@playwright/test";
+    writeFileSync(join(dir, "empty.spec.mjs"), `import { test } from "@playwright/test";
 test("runs", () => {});
 `);
-  const cli = createRequire(import.meta.url).resolve("@playwright/test/cli");
-  const run = spawnSync(process.execPath, [cli, "test", "--config", join(dir, "playwright.config.mjs")], {
-    cwd: dir, encoding: "utf8", env: { ...process.env, A11Y_BASELINE: join(dir, "a11y-baseline.json") },
-  });
-  expect(run.stderr + run.stdout).not.toContain("ERR_PACKAGE_PATH_NOT_EXPORTED");
-  expect(run.status, run.stderr + run.stdout).toBe(0);
-  expect(existsSync(join(dir, "a11y-report", "report.json"))).toBe(true);
-  rmSync(dir, { recursive: true, force: true });
+    const cli = createRequire(import.meta.url).resolve("@playwright/test/cli");
+    const run = spawnSync(process.execPath, [cli, "test", "--config", join(dir, "playwright.config.mjs")], {
+      cwd: dir, encoding: "utf8", timeout: 60_000, env: { ...process.env, A11Y_BASELINE: join(dir, "a11y-baseline.json") },
+    });
+    expect(run.stderr + run.stdout).not.toContain("ERR_PACKAGE_PATH_NOT_EXPORTED");
+    expect(run.status, run.stderr + run.stdout).toBe(0);
+    expect(existsSync(join(dir, "a11y-report", "report.json"))).toBe(true);
+  } finally {
+    // rmSync does not follow the symlinks, so the repo stays.
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
