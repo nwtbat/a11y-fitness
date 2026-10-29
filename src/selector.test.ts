@@ -34,4 +34,31 @@ describe("normalizeTarget", () => {
   it("uses the tag only for the last compound", () => {
     expect(normalizeTarget(["#shopify-section-template--21474836480__main > .x77y88"], "input")).toBe("* > input");
   });
+  it.each(["sc-abc", "jsx-abc", "svelte-abc", "astro-abc", "emotion-abc", "EMOTION-q"])(
+    "removes a class with the build prefix of %s",
+    (name) => {
+      expect(normalizeTarget([`div.${name} > button`])).toBe("div > button");
+    },
+  );
+  it("reads a CSS hex escape and its trailing space as one character", () => {
+    expect(normalizeTarget(["#\\31 23 > a"])).toBe("* > a");
+  });
+  it("uses the tag when a hex-escaped ID is the whole last compound", () => {
+    expect(normalizeTarget(["#\\31 23"], "div")).toBe("div");
+  });
+  it("keeps ~ and + combinators with :nth-child stable", () => {
+    expect(normalizeTarget(["ul>li:nth-child(2)~li+li"])).toBe("ul > li:nth-child(2) ~ li + li");
+  });
+  it("removes an escaped Tailwind class with two digits", () => {
+    expect(normalizeTarget(["div > .md\\:w-1\\/2"])).toBe("div > *");
+  });
+  it("writes * for an empty last compound when there is no tag", () => {
+    expect(normalizeTarget(["div > .css-abc"])).toBe("div > *");
+  });
+  it("leaves an empty :not() when its class is removed", () => {
+    expect(normalizeTarget(["div:not(.css-abc)"])).toBe("div:not()");
+  });
+  it("does not throw on an out-of-range hex escape", () => {
+    expect(normalizeTarget(["#\\ffffff a"])).toBe("#\\ffffff a");
+  });
 });
