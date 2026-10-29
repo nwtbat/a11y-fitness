@@ -89,6 +89,35 @@ describe("a11y-fitness baseline", () => {
     expect(cli("baseline", "prune")).toBe(0);
     expect(err).toEqual([]);
   });
+  it("init and prune warn with the same Problems lines as report.md", () => {
+    writeFileSync(join(dir, "a11y-report/report.json"), JSON.stringify({
+      scans: [{ page: "home", project: "desktop", findings: [finding("label")], fresh: [], known: [], fixed: [], disabled: {}, axeVersion: "4.10.0" }],
+      runStatus: "failed", shard: { current: 1, total: 2 }, duplicates: ["The scan name \"home\" is used two times."], problems: ["The run used --grep."],
+    }));
+    const expected = [
+      'Warning: The run status is "failed".',
+      "Warning: This report is for shard 1 of 2 only.",
+      'Warning: The scan name "home" is used two times.',
+      "Warning: The run used --grep.",
+    ];
+    expect(cli("baseline", "init")).toBe(0);
+    expect(err).toEqual(expected);
+    err.length = 0;
+    expect(cli("baseline", "prune")).toBe(0);
+    expect(err).toEqual(expected);
+  });
+  it("gives the parse error and the usage for an unknown option", () => {
+    expect(run(["baseline", "init", "--nothing"], io)).toBe(1);
+    expect(err).toHaveLength(2);
+    expect(err[0]).toContain("--nothing");
+    expect(err[1]).toBe("Usage: a11y-fitness baseline init|prune|accept|check [options]");
+  });
+  it("gives the parse error and the usage for an option without a value", () => {
+    expect(run(["baseline", "check", "--against"], io)).toBe(1);
+    expect(err).toHaveLength(2);
+    expect(err[0]).toContain("--against");
+    expect(err[1]).toBe("Usage: a11y-fitness baseline init|prune|accept|check [options]");
+  });
   it("gives the usage for an unknown command", () => {
     expect(run(["nothing"], io)).toBe(1);
     expect(err.join("\n")).toContain("Usage: a11y-fitness baseline init|prune|accept|check");

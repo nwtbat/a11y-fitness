@@ -6,14 +6,21 @@ import { parseArgs } from "node:util";
 import {
   acceptEntry, BaselineError, checkGrowth, initBaseline, pruneBaseline, readBaseline, writeBaseline, type ScanRecord,
 } from "./baseline.js";
+import { problemLines, type Report } from "./report.js";
 
 type IO = { out: (s: string) => void; err: (s: string) => void };
 const USAGE = "Usage: a11y-fitness baseline init|prune|accept|check [options]";
 
 function readReport(path: string): { scans: ScanRecord[]; problems: string[] } {
   if (!existsSync(path)) throw new BaselineError(`${path} does not exist. Run the Playwright tests first.`);
-  const report = JSON.parse(readFileSync(path, "utf8")) as { scans: ScanRecord[]; problems?: string[] };
-  return { scans: report.scans, problems: report.problems ?? [] };
+  const report = JSON.parse(readFileSync(path, "utf8")) as Partial<Report> & { scans: ScanRecord[] };
+  // The same lines as "**Problems:**" in report.md. An older report can lack the fields.
+  const problems = problemLines({
+    ...(report as Report),
+    runStatus: report.runStatus ?? null, shard: report.shard ?? null,
+    duplicates: report.duplicates ?? [], problems: report.problems ?? [],
+  });
+  return { scans: report.scans, problems };
 }
 const readScans = (path: string): ScanRecord[] => readReport(path).scans;
 
@@ -27,15 +34,24 @@ function readScansWithWarnings(path: string, io: IO): ScanRecord[] {
 const elements = (entries: { count: number }[]) => entries.reduce((n, e) => n + e.count, 0);
 
 export function run(argv: string[], io: IO): number {
-  const { values, positionals } = parseArgs({
-    args: argv, allowPositionals: true, strict: true,
-    options: {
-      baseline: { type: "string", default: process.env.A11Y_BASELINE ?? "a11y-baseline.json" },
-      report: { type: "string", default: "a11y-report/report.json" },
-      against: { type: "string" }, page: { type: "string" }, project: { type: "string" },
-      target: { type: "string" }, reason: { type: "string" },
-    },
-  });
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv, allowPositionals: true, strict: true,
+      options: {
+        baseline: { type: "string", default: process.env.A11Y_BASELINE ?? "a11y-baseline.json" },
+        report: { type: "string", default: "a11y-report/report.json" },
+        against: { type: "string" }, page: { type: "string" }, project: { type: "string" },
+        target: { type: "string" }, reason: { type: "string" },
+      },
+    });
+  } catch (error) {
+    // parseArgs gives a TypeError for an unknown option or an option without a value.
+    io.err((error as Error).message);
+    io.err(USAGE);
+    return 1;
+  }
+  const { values, positionals } = parsed;
   const [group, command, rule] = positionals;
   const baselineFile = resolve(values.baseline!);
   const reportFile = resolve(values.report!);
