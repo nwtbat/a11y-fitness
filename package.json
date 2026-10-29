@@ -1,6 +1,6 @@
 {
   "name": "@nwtbat/a11y-fitness",
-  "version": "0.1.0",
+  "version": "0.1.0-rc.2",
   "description": "Accessibility fitness functions for Playwright: axe scans with a baseline ratchet, keyboard tests, and a report.",
   "type": "module",
   "license": "MIT",
@@ -10,9 +10,9 @@
   "engines": { "node": ">=20" },
   "bin": { "a11y-fitness": "dist/cli.js" },
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./test": { "types": "./dist/test.d.ts", "import": "./dist/test.js" },
-    "./reporter": { "types": "./dist/reporter.d.ts", "import": "./dist/reporter.js" }
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" },
+    "./test": { "types": "./dist/test.d.ts", "import": "./dist/test.js", "default": "./dist/test.js" },
+    "./reporter": { "types": "./dist/reporter.d.ts", "import": "./dist/reporter.js", "default": "./dist/reporter.js" }
   },
   "files": ["dist"],
   "scripts": {
@@ -20,6 +20,7 @@
     "prepare": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "pretest:browser": "tsup",
     "test:browser": "playwright test",
     "test:all": "npm run typecheck && npm test && npm run test:browser"
   },
