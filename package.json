@@ -1,20 +1,41 @@
 {
   "name": "@nwtbat/a11y-fitness",
-  "version": "0.1.0-rc.2",
+  "version": "0.1.0",
   "description": "Accessibility fitness functions for Playwright: axe scans with a baseline ratchet, keyboard tests, and a report.",
   "type": "module",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/nwtbat/a11y-fitness.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nwtbat/a11y-fitness.git"
+  },
   "homepage": "https://github.com/nwtbat/a11y-fitness#readme",
   "bugs": "https://github.com/nwtbat/a11y-fitness/issues",
-  "engines": { "node": ">=20" },
-  "bin": { "a11y-fitness": "dist/cli.js" },
-  "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" },
-    "./test": { "types": "./dist/test.d.ts", "import": "./dist/test.js", "default": "./dist/test.js" },
-    "./reporter": { "types": "./dist/reporter.d.ts", "import": "./dist/reporter.js", "default": "./dist/reporter.js" }
+  "engines": {
+    "node": ">=20"
   },
-  "files": ["dist"],
+  "bin": {
+    "a11y-fitness": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./test": {
+      "types": "./dist/test.d.ts",
+      "import": "./dist/test.js",
+      "default": "./dist/test.js"
+    },
+    "./reporter": {
+      "types": "./dist/reporter.d.ts",
+      "import": "./dist/reporter.js",
+      "default": "./dist/reporter.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "prepare": "tsup",
