@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "entries": [
+    { "page": "violations", "project": "chromium", "rule": "image-alt", "target": "img", "count": 1, "reason": "" },
+    { "page": "violations", "project": "chromium", "rule": "label", "target": "input[type=\"email\"]", "count": 1, "reason": "" },
+    { "page": "violations", "project": "chromium", "rule": "label", "target": "input[type=\"text\"]", "count": 1, "reason": "" }
+  ]
+}

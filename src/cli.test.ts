@@ -1,0 +1,187 @@
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { beforeEach, describe, expect, it } from "vitest";
+import { run } from "./cli.js";
+
+let dir: string;
+let out: string[];
+let err: string[];
+const io = { out: (s: string) => out.push(s), err: (s: string) => err.push(s) };
+const cli = (...args: string[]) => run([...args, "--baseline", join(dir, "a11y-baseline.json"), "--report", join(dir, "a11y-report/report.json")], io);
+const finding = (rule: string) => ({ page: "home", project: "desktop", rule, target: "input", impact: "critical", help: "", helpUrl: "", html: "" });
+
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), "a11y-cli-"));
+  out = [];
+  err = [];
+  mkdirSync(join(dir, "a11y-report"));
+  writeFileSync(join(dir, "a11y-report/report.json"), JSON.stringify({
+    scans: [{ page: "home", project: "desktop", findings: [finding("label")], fresh: [], known: [], fixed: [], disabled: {}, axeVersion: "4.10.0" }],
+  }));
+});
+
+describe("a11y-fitness baseline", () => {
+  it("init writes the baseline from the report", () => {
+    expect(cli("baseline", "init")).toBe(0);
+    const b = JSON.parse(readFileSync(join(dir, "a11y-baseline.json"), "utf8"));
+    expect(b.entries).toEqual([{ page: "home", project: "desktop", rule: "label", target: "input", count: 1, reason: "" }]);
+    expect(out.join("\n")).toContain("Wrote 1 entries for 1 elements");
+  });
+  it("init refuses to replace a baseline", () => {
+    cli("baseline", "init");
+    expect(cli("baseline", "init")).toBe(1);
+    expect(err.join("\n")).toContain('exists. Use "baseline prune" or "baseline accept".');
+  });
+  it("init tells the operator to run the tests when there is no report", () => {
+    expect(run(["baseline", "init", "--baseline", join(dir, "b.json"), "--report", join(dir, "none.json")], io)).toBe(1);
+    expect(err.join("\n")).toContain("Run the Playwright tests first.");
+  });
+  it("prune removes the fixed entries", () => {
+    writeFileSync(join(dir, "a11y-baseline.json"), JSON.stringify({ version: 1, entries: [
+      { page: "home", project: "desktop", rule: "label", target: "input", count: 1, reason: "" },
+      { page: "home", project: "desktop", rule: "region", target: "div", count: 1, reason: "" },
+    ] }));
+    expect(cli("baseline", "prune")).toBe(0);
+    expect(JSON.parse(readFileSync(join(dir, "a11y-baseline.json"), "utf8")).entries).toHaveLength(1);
+    expect(out.join("\n")).toContain("Removed 1 fixed elements");
+  });
+  it("accept adds an entry with the reason", () => {
+    expect(cli("baseline", "accept", "region", "--page", "home", "--project", "desktop", "--target", "div", "--reason", "Vendor widget.")).toBe(0);
+    expect(JSON.parse(readFileSync(join(dir, "a11y-baseline.json"), "utf8")).entries[0].reason).toBe("Vendor widget.");
+  });
+  it("accept needs all options", () => {
+    expect(cli("baseline", "accept", "region", "--page", "home")).toBe(1);
+    expect(err.join("\n")).toContain("accept needs --page, --project, --target, and --reason.");
+  });
+  it("check fails growth without a reason", () => {
+    const against = join(dir, "base.json");
+    writeFileSync(against, JSON.stringify({ version: 1, entries: [] }));
+    writeFileSync(join(dir, "a11y-baseline.json"), JSON.stringify({ version: 1, entries: [
+      { page: "home", project: "desktop", rule: "label", target: "input", count: 1, reason: "" }] }));
+    expect(cli("baseline", "check", "--against", against)).toBe(1);
+    expect(err.join("\n")).toContain("without a reason");
+  });
+  it("check passes and reminds about prune when the report has fixed entries", () => {
+    const against = join(dir, "base.json");
+    writeFileSync(against, JSON.stringify({ version: 1, entries: [] }));
+    writeFileSync(join(dir, "a11y-report/report.json"), JSON.stringify({ scans: [{ page: "home", project: "desktop", findings: [], fresh: [], known: [],
+      fixed: [{ page: "home", project: "desktop", rule: "label", target: "input", count: 1, reason: "" }], disabled: {}, axeVersion: "4.10.0" }] }));
+    expect(cli("baseline", "check", "--against", against)).toBe(0);
+    expect(out.join("\n")).toContain('1 elements in the baseline are fixed. Run "a11y-fitness baseline prune".');
+  });
+  it("init and prune warn about the problems of the report, and then continue", () => {
+    const problems = ["The run used --grep. Some tests did not run.", "A scan attachment is not valid."];
+    writeFileSync(join(dir, "a11y-report/report.json"), JSON.stringify({
+      scans: [{ page: "home", project: "desktop", findings: [finding("label")], fresh: [], known: [], fixed: [], disabled: {}, axeVersion: "4.10.0" }],
+      problems,
+    }));
+    expect(cli("baseline", "init")).toBe(0);
+    expect(err).toEqual(problems.map((p) => `Warning: ${p}`));
+    expect(existsSync(join(dir, "a11y-baseline.json"))).toBe(true);
+    err.length = 0;
+    expect(cli("baseline", "prune")).toBe(0);
+    expect(err).toEqual(problems.map((p) => `Warning: ${p}`));
+    expect(out.join("\n")).toContain("Removed 0 fixed elements");
+  });
+  it("init and prune give no warning when the report has no problems", () => {
+    expect(cli("baseline", "init")).toBe(0);
+    expect(cli("baseline", "prune")).toBe(0);
+    expect(err).toEqual([]);
+  });
+  it("init and prune warn with the same Problems lines as report.md", () => {
+    writeFileSync(join(dir, "a11y-report/report.json"), JSON.stringify({
+      scans: [{ page: "home", project: "desktop", findings: [finding("label")], fresh: [], known: [], fixed: [], disabled: {}, axeVersion: "4.10.0" }],
+      runStatus: "failed", shard: { current: 1, total: 2 }, duplicates: ["The scan name \"home\" is used two times."], problems: ["The run used --grep."],
+    }));
+    const expected = [
+      'Warning: The run status is "failed".',
+      "Warning: This report is for shard 1 of 2 only.",
+      'Warning: The scan name "home" is used two times.',
+      "Warning: The run used --grep.",
+    ];
+    expect(cli("baseline", "init")).toBe(0);
+    expect(err).toEqual(expected);
+    err.length = 0;
+    expect(cli("baseline", "prune")).toBe(0);
+    expect(err).toEqual(expected);
+  });
+  it("gives the parse error and the usage for an unknown option", () => {
+    expect(run(["baseline", "init", "--nothing"], io)).toBe(1);
+    expect(err).toHaveLength(2);
+    expect(err[0]).toContain("--nothing");
+    expect(err[1]).toBe("Usage: a11y-fitness baseline init|prune|accept|check [options]");
+  });
+  it("gives the parse error and the usage for an option without a value", () => {
+    expect(run(["baseline", "check", "--against"], io)).toBe(1);
+    expect(err).toHaveLength(2);
+    expect(err[0]).toContain("--against");
+    expect(err[1]).toBe("Usage: a11y-fitness baseline init|prune|accept|check [options]");
+  });
+  it("check passes when the target branch has no baseline", () => {
+    const against = join(dir, "missing.json");
+    writeFileSync(join(dir, "a11y-baseline.json"), JSON.stringify({ version: 1, entries: [
+      { page: "home", project: "desktop", rule: "label", target: "input", count: 1, reason: "" }] }));
+    expect(cli("baseline", "check", "--against", against)).toBe(0);
+    expect(out).toContain(`${against} does not exist. The target branch has no baseline. The check passes.`);
+    expect(err).toEqual([]);
+  });
+  it("check without a target baseline still fails a corrupt current baseline", () => {
+    writeFileSync(join(dir, "a11y-baseline.json"), "{ not json");
+    expect(cli("baseline", "check", "--against", join(dir, "missing.json"))).toBe(1);
+    expect(err.join("\n")).toContain("is not a valid baseline");
+  });
+  it("check without a target baseline still gives the prune hint", () => {
+    writeFileSync(join(dir, "a11y-report/report.json"), JSON.stringify({ scans: [{ page: "home", project: "desktop", findings: [], fresh: [], known: [],
+      fixed: [{ page: "home", project: "desktop", rule: "label", target: "input", count: 2, reason: "" }], disabled: {}, axeVersion: "4.10.0" }] }));
+    expect(cli("baseline", "check", "--against", join(dir, "missing.json"))).toBe(0);
+    expect(out.join("\n")).toContain('2 elements in the baseline are fixed. Run "a11y-fitness baseline prune".');
+  });
+  it("check with an empty target baseline still needs a reason for growth", () => {
+    const against = join(dir, "base.json");
+    writeFileSync(against, JSON.stringify({ version: 1, entries: [] }));
+    writeFileSync(join(dir, "a11y-baseline.json"), JSON.stringify({ version: 1, entries: [
+      { page: "home", project: "desktop", rule: "label", target: "input", count: 1, reason: "" }] }));
+    expect(cli("baseline", "check", "--against", against)).toBe(1);
+    expect(out.join("\n")).not.toContain("The check passes.");
+  });
+  it.each([["invalid JSON", "{ not json"], ["no scans list", "{}"]])("init refuses a report with %s", (_, text) => {
+    const report = join(dir, "a11y-report/report.json");
+    writeFileSync(report, text);
+    expect(cli("baseline", "init")).toBe(1);
+    expect(err.join("\n")).toContain(`${report} is not a valid report: `);
+    expect(existsSync(join(dir, "a11y-baseline.json"))).toBe(false);
+  });
+  it.each([["invalid JSON", "{ not json"], ["no scans list", "{}"]])("prune refuses a report with %s", (_, text) => {
+    writeFileSync(join(dir, "a11y-report/report.json"), text);
+    expect(cli("baseline", "prune")).toBe(1);
+    expect(err.join("\n")).toContain("is not a valid report: ");
+  });
+  it.each([["invalid JSON", "{ not json"], ["no scans list", "{}"]])("check warns about a report with %s and continues", (_, text) => {
+    const report = join(dir, "a11y-report/report.json");
+    writeFileSync(report, text);
+    const against = join(dir, "base.json");
+    writeFileSync(against, JSON.stringify({ version: 1, entries: [] }));
+    expect(cli("baseline", "check", "--against", against)).toBe(0);
+    expect(err).toHaveLength(1);
+    expect(err[0]).toMatch(new RegExp(`^Warning: .*report\\.json is not a valid report: `));
+  });
+  it("uses A11Y_BASELINE as the default baseline path", () => {
+    const saved = process.env.A11Y_BASELINE;
+    const file = join(dir, "from-env.json");
+    process.env.A11Y_BASELINE = file;
+    try {
+      expect(run(["baseline", "init", "--report", join(dir, "a11y-report/report.json")], io)).toBe(0);
+      expect(existsSync(file)).toBe(true);
+      expect(out.join("\n")).toContain(`to ${file}.`);
+    } finally {
+      if (saved === undefined) delete process.env.A11Y_BASELINE;
+      else process.env.A11Y_BASELINE = saved;
+    }
+  });
+  it("gives the usage for an unknown command", () => {
+    expect(run(["nothing"], io)).toBe(1);
+    expect(err.join("\n")).toContain("Usage: a11y-fitness baseline init|prune|accept|check");
+    expect(existsSync(join(dir, "a11y-baseline.json"))).toBe(false);
+  });
+});

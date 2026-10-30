@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><title>Keyboard</title>
+<style>
+  .visible:focus-visible { outline: 2px solid #005fcc; }
+  .hidden-focus:focus { outline: none; }
+  .shadow:focus { outline: none; box-shadow: 0 0 0 3px #005fcc; }
+  .border-width { border: 2px solid #333; }
+  .transition { transition: box-shadow .2s; }
+  .transition:focus { outline: none; box-shadow: 0 0 0 3px #005fcc; }
+  .border-width:focus { outline: none; border-width: 4px; }
+</style>
+</head>
+<body>
+  <button id="a" class="visible">A</button>
+  <button id="b" class="visible">B</button>
+  <button id="c" class="hidden-focus">C</button>
+  <div id="free"><button>Free 1</button><button>Free 2</button></div>
+  <div id="trap"><button id="t1">Trap 1</button><button id="t2">Trap 2</button></div>
+  <button id="open" class="visible">Open dialog</button>
+  <div id="dialog" role="dialog" aria-label="Example" hidden>
+    <button id="close">Close</button>
+  </div>
+  <button id="open-bad">Open bad dialog</button>
+  <div id="bad" role="dialog" aria-label="Bad" hidden><button>Inside</button></div>
+  <button id="shadow" class="shadow">Shadow</button>
+  <button id="transition" class="transition">Transition</button>
+  <div id="hidden-trap"><button id="h1">Hidden trap 1</button><button id="h2">Hidden trap 2</button><button id="h3" style="display:none">Hidden</button></div>
+  <button id="border-width" class="border-width">Border width</button>
+  <button id="open-no-escape">Open dialog without Escape</button>
+  <div id="no-escape" role="dialog" aria-label="No Escape" hidden><button id="no-escape-inside">Inside</button></div>
+  <button id="open-no-return">Open dialog without focus return</button>
+  <div id="no-return" role="dialog" aria-label="No return" hidden><button id="no-return-inside">Inside</button></div>
+  <button id="after">After</button>
+  <script>
+    const trap = document.getElementById("trap");
+    trap.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab") return;
+      e.preventDefault();
+      const next = document.activeElement.id === "t1" ? "t2" : "t1";
+      document.getElementById(next).focus();
+    });
+    const hiddenTrap = document.getElementById("hidden-trap");
+    // Traps only the forward Tab key. Shift+Tab leaves the region as usual.
+    hiddenTrap.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab" || e.shiftKey) return;
+      e.preventDefault();
+      const next = document.activeElement.id === "h1" ? "h2" : "h1";
+      document.getElementById(next).focus();
+    });
+    const open = document.getElementById("open"), dialog = document.getElementById("dialog");
+    open.addEventListener("click", () => { dialog.hidden = false; document.getElementById("close").focus(); });
+    dialog.addEventListener("keydown", (e) => { if (e.key === "Escape") { dialog.hidden = true; open.focus(); } });
+    const noEscape = document.getElementById("no-escape");
+    document.getElementById("open-no-escape").addEventListener("click", () => {
+      noEscape.hidden = false; document.getElementById("no-escape-inside").focus();
+    });
+    const noReturn = document.getElementById("no-return");
+    document.getElementById("open-no-return").addEventListener("click", () => {
+      noReturn.hidden = false; document.getElementById("no-return-inside").focus();
+    });
+    noReturn.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { noReturn.hidden = true; document.getElementById("after").focus(); }
+    });
+    document.getElementById("open-bad").addEventListener("click", () => { document.getElementById("bad").hidden = false; });
+  </script>
+</body>
+</html>
